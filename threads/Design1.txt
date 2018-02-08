@@ -7,7 +7,7 @@ CIS 520 - Programming Project #1
 >> Fill in the names and email addresses of your group members.
 
 William Van Cleve <vancleve@ksu.edu>
-FirstName LastName <email@k-state.edu>
+Shawn Kirby <skirby@k-state.edu>
 ...
 
 ---- PRELIMINARIES ----
