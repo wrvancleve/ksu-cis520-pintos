@@ -29,9 +29,6 @@ static struct list ready_list;
    when they are first scheduled and removed when they exit. */
 static struct list all_list;
 
-/* List of all sleeping */
-static struct list sleep_list;
-
 /* Idle thread. */
 static struct thread *idle_thread;
 
@@ -96,7 +93,6 @@ thread_init (void)
   lock_init (&tid_lock);
   list_init (&ready_list);
   list_init (&all_list);
-  list_init (&sleep_list); // Initialize sleep list
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
@@ -207,26 +203,6 @@ thread_create (const char *name, int priority,
   thread_unblock (t);
 
   return tid;
-}
-
-/* Puts the current thread to sleep until the wake time. 
-   Inspired by: http://stuartharrell.com/blog/2016/12/16/efficient-alarm-clock/ */
-void
-thread_sleep (int wake_time)
-{
-	enum intr_level old_level;	
-	ASSERT (!intr_context ());
-	old_level = intr_disable ();
-	
-	thread_current()->status = THREAD_BLOCKED; // Change thread status to blocked
-	thread_current()->wake_tick = wake_time; // Set thread wake time
-	
-	struct semaphore sleeping_thread;
-    sema_init(&sleeping_thread, 0);
-	list_push_front(&sleep_list, sleeping_thread);
-	
-	schedule();
-	intr_set_level (old_level);
 }
 
 /* Puts the current thread to sleep.  It will not be scheduled
