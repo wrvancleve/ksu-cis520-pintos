@@ -58,7 +58,7 @@ Connor McElroy <>
           2: Get the current running thread.
           3: Set the current thread's wake tick to the current tick plus the amount of ticks to sleep.
           4: Insert sleeping thread into the sleeping list by its wake tick.
-          5: Block the thread
+          5: Block the thread.
                
      timer_interrupt():
           1: Get the first element in the sleeping list.
