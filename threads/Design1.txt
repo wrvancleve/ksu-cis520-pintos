@@ -8,7 +8,7 @@ CIS 520 - Programming Project #1
 
 William Van Cleve <vancleve@ksu.edu>
 Shawn Kirby <skirby@k-state.edu>
-...
+Connor McElroy <>
 
 ---- PRELIMINARIES ----
 
@@ -29,15 +29,53 @@ Shawn Kirby <skirby@k-state.edu>
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
 
+     thread.h:
+          int64_t wake_tick;                  /* Wake up tick of a sleeping thread */
+
+
+     timer.c:
+          static struct list sleep_list;      /* List of sleeping threads. */
+
+          /* Function to determine the smallest wake tick between two threads
+
+             Inspired by: http://stuartharrell.com/blog/2016/12/16/efficient-alarm-clock/ */
+          static bool wake_tick_less_func(const struct list_elem *e1, const struct list_elem *e2, void *aux UNUSED) {
+
+               struct thread *t1 = list_entry(e1, struct thread, elem);
+               struct thread *t2 = list_entry(e2, struct thread, elem); 
+               return t1->wake_tick < t2->wake_tick; 
+          
+}
+
 
 ---- ALGORITHMS ----
 
 >> A2: Briefly describe what happens in a call to your timer_sleep(),
 >> including the effects of the timer interrupt handler.
 
+     timer_sleep():
+          1: Check if the ticks parameter is valid. (Not negative or zero)
+          2: Get the current running thread.
+          3: Set the current thread's wake tick to the current tick plus the amount of ticks to sleep.
+          4: Insert sleeping thread into the sleeping list by its wake tick.
+          5: Block the thread
+               
+     timer_interrupt():
+          1: Get the first element in the sleeping list.
+          2: Loop through the sleeping list.
+               1: Get element's thread.
+               2: If thread's wake tick is greater than the current tick, end loop. (List contains no threads that need to wake up)
+               3: Else remove thread from sleeping list to be woken up.
+               4: Unblock/wake thread.
+               5: Get next list element.
+
 >> A3: What steps are taken to minimize the amount of time spent in
 >> the timer interrupt handler?
 
+     The sleeping list is ordered by wake ticks. So when iterating through the sleeping list we can stop
+     when we reach a sleeping thread with a wake tick that hasn't happened yet. We can stop there because
+     all threads following this thread in the list will have wake ticks the same or larger. No other thread
+     needs to be woken up. This allows for shorter times in the timer interrupt handler.
 
 ---- SYNCHRONIZATION ----
 

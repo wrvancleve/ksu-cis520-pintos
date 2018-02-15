@@ -27,14 +27,13 @@ static unsigned loops_per_tick;
 /* List of sleeping threads. */
 static struct list sleep_list;
 
-/* Function to determine the smallest wake time between to threads
-   Inspired by: http://stuartharrell.com/blog/2016/12/16/efficient-alarm-clock/  */
-static bool wake_time_less_func(const struct list_elem *e1, const struct list_elem *e2, void *aux UNUSED) {
+/* Function to determine the smallest wake tick between two threads
+   Inspired by: http://stuartharrell.com/blog/2016/12/16/efficient-alarm-clock/ */
+static bool wake_tick_less_func(const struct list_elem *e1, const struct list_elem *e2, void *aux UNUSED) {
 	struct thread *t1 = list_entry(e1, struct thread, elem); // Thread 1
 	struct thread *t2 = list_entry(e2, struct thread, elem); // Thread 2
 	return t1->wake_tick < t2->wake_tick; // Return whether t1's wake time is smaller or larger than t2's wake time
 }
-
 
 static intr_handler_func timer_interrupt;
 static bool too_many_loops (unsigned loops);
@@ -102,27 +101,16 @@ timer_elapsed (int64_t then)
 void
 timer_sleep (int64_t ticks) 
 {
-  ASSERT(intr_get_level() == INTR_ON); // Assert interrupts on
+  ASSERT(intr_get_level() == INTR_ON);
+  if (ticks <= 0) return; // Return if ticks isn't valid
   
-  //if (ticks <= 0) return;
-  
-  enum intr_level old_level; // Interrupt enum
-  old_level = intr_disable(); // Turn interrupts off
+  enum intr_level old_level;
+  old_level = intr_disable();
   
   struct thread *current = thread_current(); // Get current thread
   current->wake_tick = timer_ticks() + ticks; // Set thread wake tick
   
-  /*
-  struct list_elem *e; // List element
-  for (e = list_begin(&sleep_list); e != list_end(&sleep_list); e = list_next(e)) {
-	struct thread *t1 = list_entry(&current->elem, struct thread, elem); // Get thread 1
-	struct thread *t2 = list_entry(e, struct thread, elem); // Get thread 2
-	if (t1->wake_tick < t2->wake_tick) break; // Found before element
-  }
-  list_insert(e, &current->elem); // Insert thread after before element
-  */
-  
-  list_insert_ordered(&sleep_list, &current->elem, wake_time_less_func, NULL);
+  list_insert_ordered(&sleep_list, &current->elem, wake_tick_less_func, NULL); // Insert thread in sleep list by wake tick
   thread_block(); // Block thread
 
   intr_set_level (old_level);
@@ -203,20 +191,17 @@ static void
 timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
-  thread_tick ();
-  
-  enum intr_level old_level; // Interrupt enum
-  old_level = intr_disable(); // Turn interrupts off
+  thread_tick();
   
   struct list_elem *e = list_begin(&sleep_list); // Get first element
-  struct thread *t = list_entry(e, struct thread, elem); // Get first element's thread
-  while (e != NULL && t->wake_tick >= ticks) {
-	  list_remove(e); // Remove sleeping thread from sleep list to be woken up
-	  thread_unblock(t); // Unblock sleeping thread
-	  e = list_next(e); // Get next list element
+  while (e != list_end(&sleep_list)) {
+	struct thread *t = list_entry(e, struct thread, elem); // Get first element's thread
+	if (t->wake_tick > ticks) break; // Reached threads that aren't ready to wake up
+	  
+	list_remove(e); // Remove sleeping thread from sleep list to be woken up
+	thread_unblock(t); // Unblock sleeping thread
+	e = list_begin(&sleep_list); // Get next list element
   }
-  
-  intr_set_level (old_level);
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
