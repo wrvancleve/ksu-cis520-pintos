@@ -27,8 +27,16 @@ static unsigned loops_per_tick;
 /* List of sleeping threads. */
 static struct list sleep_list;
 
-/* Function to determine the smallest wake tick between two threads
-   Inspired by: http://stuartharrell.com/blog/2016/12/16/efficient-alarm-clock/ */
+/* 
+   Added By: William Van Cleve, Shawn Kirby and Connor McElroy
+   
+   Inspired By: http://stuartharrell.com/blog/2016/12/16/efficient-alarm-clock/ 
+       https://github.com/yuan901202/pintos_1
+       https://github.com/ryantimwilson/Pintos-Project-1
+	   https://github.com/microdog/pintos-project-1
+	   https://github.com/nekketsuing/Pintos-Project-1		
+				
+   Function to determine the smaller wake tick between two sleeping threads.                    		 */
 static bool wake_tick_less_func(const struct list_elem *e1, const struct list_elem *e2, void *aux UNUSED) {
 	struct thread *t1 = list_entry(e1, struct thread, elem); // Thread 1
 	struct thread *t2 = list_entry(e2, struct thread, elem); // Thread 2
@@ -41,7 +49,16 @@ static void busy_wait (int64_t loops);
 static void real_time_sleep (int64_t num, int32_t denom);
 static void real_time_delay (int64_t num, int32_t denom);
 
-/* Sets up the timer to interrupt TIMER_FREQ times per second,
+/* 
+   Modified By: William Van Cleve, Shawn Kirby and Connor McElroy
+   
+   Changes Inspired By: http://stuartharrell.com/blog/2016/12/16/efficient-alarm-clock/ 
+       https://github.com/yuan901202/pintos_1
+       https://github.com/ryantimwilson/Pintos-Project-1
+	   https://github.com/microdog/pintos-project-1
+	   https://github.com/nekketsuing/Pintos-Project-1
+   
+   Sets up the timer to interrupt TIMER_FREQ times per second,
    and registers the corresponding interrupt. */
 void
 timer_init (void) 
@@ -96,8 +113,16 @@ timer_elapsed (int64_t then)
   return timer_ticks () - then;
 }
 
-/* Sleeps for approximately TICKS timer ticks.  Interrupts must
-   be turned on. */
+/* 
+   Modified By: William Van Cleve, Shawn Kirby and Connor McElroy
+   
+   Changes Inspired By: http://stuartharrell.com/blog/2016/12/16/efficient-alarm-clock/ 
+       https://github.com/yuan901202/pintos_1
+       https://github.com/ryantimwilson/Pintos-Project-1
+	   https://github.com/microdog/pintos-project-1
+	   https://github.com/nekketsuing/Pintos-Project-1
+   
+   Sleeps for approximately TICKS timer ticks.  Interrupts must be turned on. */
 void
 timer_sleep (int64_t ticks) 
 {
@@ -186,7 +211,17 @@ timer_print_stats (void)
   printf ("Timer: %"PRId64" ticks\n", timer_ticks ());
 }
 
-/* Timer interrupt handler. */
+
+/* 
+   Modified By: William Van Cleve, Shawn Kirby and Connor McElroy
+   
+   Changes Inspired By: http://stuartharrell.com/blog/2016/12/16/efficient-alarm-clock/ 
+       https://github.com/yuan901202/pintos_1
+       https://github.com/ryantimwilson/Pintos-Project-1
+	   https://github.com/microdog/pintos-project-1
+	   https://github.com/nekketsuing/Pintos-Project-1
+
+   Timer interrupt handler.                   */
 static void
 timer_interrupt (struct intr_frame *args UNUSED)
 {
