@@ -50,7 +50,15 @@ sema_init (struct semaphore *sema, unsigned value)
   list_init (&sema->waiters);
 }
 
-/* Down or "P" operation on a semaphore.  Waits for SEMA's value
+/* 
+   Modified By: William Van Cleve, Shawn Kirby and Connor McElroy
+   
+   Changes Inspired By: https://github.com/yuan901202/pintos_2
+       https://github.com/ryantimwilson/Pintos-Project-1
+	   https://github.com/microdog/pintos-project-1
+	   https://github.com/nekketsuing/Pintos-Project-1
+
+   Down or "P" operation on a semaphore.  Waits for SEMA's value
    to become positive and then atomically decrements it.
 
    This function may sleep, so it must not be called within an
@@ -68,6 +76,7 @@ sema_down (struct semaphore *sema)
   old_level = intr_disable ();
   while (sema->value == 0) 
     {
+	  thread_try_donate_priority(); // Try donating priority
       list_push_back (&sema->waiters, &thread_current ()->elem);
       thread_block ();
     }
@@ -75,7 +84,15 @@ sema_down (struct semaphore *sema)
   intr_set_level (old_level);
 }
 
-/* Down or "P" operation on a semaphore, but only if the
+/* 
+   Modified By: William Van Cleve, Shawn Kirby and Connor McElroy
+   
+   Changes Inspired By: https://github.com/yuan901202/pintos_2
+       https://github.com/ryantimwilson/Pintos-Project-1
+	   https://github.com/microdog/pintos-project-1
+	   https://github.com/nekketsuing/Pintos-Project-1
+   
+   Down or "P" operation on a semaphore, but only if the
    semaphore is not already 0.  Returns true if the semaphore is
    decremented, false otherwise.
 
@@ -89,19 +106,29 @@ sema_try_down (struct semaphore *sema)
   ASSERT (sema != NULL);
 
   old_level = intr_disable ();
-  if (sema->value > 0) 
-    {
-      sema->value--;
-      success = true; 
-    }
-  else
-    success = false;
+  if (sema->value > 0) {
+    sema->value--;
+    success = true; 
+  }
+  else {
+	thread_try_donate_priority(); // Try donating priority
+    success = false;	
+  }
+  
   intr_set_level (old_level);
 
   return success;
 }
 
-/* Up or "V" operation on a semaphore.  Increments SEMA's value
+/* 
+   Modified By: William Van Cleve, Shawn Kirby and Connor McElroy
+   
+   Changes Inspired By: https://github.com/yuan901202/pintos_2
+       https://github.com/ryantimwilson/Pintos-Project-1
+	   https://github.com/microdog/pintos-project-1
+	   https://github.com/nekketsuing/Pintos-Project-1
+   
+   Up or "V" operation on a semaphore.  Increments SEMA's value
    and wakes up one thread of those waiting for SEMA, if any.
 
    This function may be called from an interrupt handler. */
@@ -113,10 +140,13 @@ sema_up (struct semaphore *sema)
   ASSERT (sema != NULL);
 
   old_level = intr_disable ();
-  if (!list_empty (&sema->waiters)) 
-    thread_unblock (list_entry (list_pop_front (&sema->waiters),
-                                struct thread, elem));
+  if (!list_empty (&sema->waiters)) {
+	list_sort (&sema->waiters, priority_less_func, NULL); // Sort waiters list to remove highest priority
+	thread_unblock(list_entry (list_pop_front (&sema->waiters), struct thread, elem));  
+  }
+  
   sema->value++;
+  thread_try_yield(); // Try yield on unblocked thread
   intr_set_level (old_level);
 }
 
@@ -181,7 +211,15 @@ lock_init (struct lock *lock)
   sema_init (&lock->semaphore, 1);
 }
 
-/* Acquires LOCK, sleeping until it becomes available if
+/* 
+   Modified By: William Van Cleve, Shawn Kirby and Connor McElroy
+   
+   Changes Inspired By: https://github.com/yuan901202/pintos_2
+       https://github.com/ryantimwilson/Pintos-Project-1
+	   https://github.com/microdog/pintos-project-1
+	   https://github.com/nekketsuing/Pintos-Project-1
+
+   Acquires LOCK, sleeping until it becomes available if
    necessary.  The lock must not already be held by the current
    thread.
 
@@ -196,11 +234,30 @@ lock_acquire (struct lock *lock)
   ASSERT (!intr_context ());
   ASSERT (!lock_held_by_current_thread (lock));
 
+  enum intr_level old_level = intr_disable();
+  
+  struct thread *current = thread_current(); // Get current thread
+  if (lock->holder != NULL) { // Lock is current being held
+	  current->waiting_lock = lock; // Set waiting lock
+	  list_insert_ordered(&lock->holder->donations, &current->donations, priority_less_func, NULL); // Update donations list
+  }
+  
   sema_down (&lock->semaphore);
-  lock->holder = thread_current ();
+  current->waiting_lock = NULL; // Clear waiting lock because it has been received
+  lock->holder = current;
+  
+  intr_set_level(old_level);
 }
 
-/* Tries to acquires LOCK and returns true if successful or false
+/* 
+   Modified By: William Van Cleve, Shawn Kirby and Connor McElroy
+   
+   Changes Inspired By: https://github.com/yuan901202/pintos_2
+       https://github.com/ryantimwilson/Pintos-Project-1
+	   https://github.com/microdog/pintos-project-1
+	   https://github.com/nekketsuing/Pintos-Project-1
+
+   Tries to acquires LOCK and returns true if successful or false
    on failure.  The lock must not already be held by the current
    thread.
 
@@ -214,9 +271,16 @@ lock_try_acquire (struct lock *lock)
   ASSERT (lock != NULL);
   ASSERT (!lock_held_by_current_thread (lock));
 
+  enum intr_level old_level = intr_disable();
+  
   success = sema_try_down (&lock->semaphore);
-  if (success)
-    lock->holder = thread_current ();
+  if (success) { // If lock acquired
+	  struct thread *current = thread_current(); // Get current thread
+	  current->waiting_lock = NULL; // Clear waiting lock
+	  lock->holder = current; // Set lock's holder to current thread
+  }
+    
+  intr_set_level(old_level);
   return success;
 }
 
@@ -316,9 +380,9 @@ cond_signal (struct condition *cond, struct lock *lock UNUSED)
   ASSERT (!intr_context ());
   ASSERT (lock_held_by_current_thread (lock));
 
-  if (!list_empty (&cond->waiters)) 
-    sema_up (&list_entry (list_pop_front (&cond->waiters),
-                          struct semaphore_elem, elem)->semaphore);
+  if (!list_empty (&cond->waiters)) {
+	sema_up (&list_entry (list_pop_front (&cond->waiters), struct semaphore_elem, elem)->semaphore);	  
+  }
 }
 
 /* Wakes up all threads, if any, waiting on COND (protected by

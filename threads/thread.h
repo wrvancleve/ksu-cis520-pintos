@@ -99,7 +99,7 @@ struct thread
 	int original_priority;              /* Original priority */ 
 	struct list donations;              /* List of donations */
 	struct list_elem donation_elem;     /* Donation element */
-	struct lock *waiting_lock;           /* Waiting lock */
+	struct lock *waiting_lock;          /* Waiting lock */
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
@@ -146,5 +146,10 @@ int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
+
+/* Added for priority scheduling. */
+bool priority_less_func(const struct list_elem *e1, const struct list_elem *e2, void *aux UNUSED);
+void thread_try_yield(void);
+void thread_try_donate_priority(void);
 
 #endif /* threads/thread.h */

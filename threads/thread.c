@@ -25,8 +25,16 @@
    that are ready to run but not actually running. */
 static struct list ready_list;
 
-/* Function to determine the smallest priority between two threads */
-static bool priority_less_func(const struct list_elem *e1, const struct list_elem *e2, void *aux UNUSED) {
+/* 
+   Added By: William Van Cleve, Shawn Kirby and Connor McElroy
+   
+   Inspired By: https://github.com/yuan901202/pintos_2
+       https://github.com/ryantimwilson/Pintos-Project-1
+	   https://github.com/microdog/pintos-project-1
+	   https://github.com/nekketsuing/Pintos-Project-1
+   
+   Function to determine the smallest priority between two threads.                                     */
+bool priority_less_func(const struct list_elem *e1, const struct list_elem *e2, void *aux UNUSED) {
 	struct thread *t1 = list_entry(e1, struct thread, elem); // Thread 1
 	struct thread *t2 = list_entry(e2, struct thread, elem); // Thread 2
 	return t1->priority < t2->priority; // Return whether t1's priority is smaller or larger than t2's priority
@@ -155,7 +163,15 @@ thread_print_stats (void)
           idle_ticks, kernel_ticks, user_ticks);
 }
 
-/* Creates a new kernel thread named NAME with the given initial
+/* 
+   Modified By: William Van Cleve, Shawn Kirby and Connor McElroy
+   
+   Changes Inspired By: https://github.com/yuan901202/pintos_2
+       https://github.com/ryantimwilson/Pintos-Project-1
+	   https://github.com/microdog/pintos-project-1
+	   https://github.com/nekketsuing/Pintos-Project-1
+	   
+   Creates a new kernel thread named NAME with the given initial
    PRIORITY, which executes FUNCTION passing AUX as the argument,
    and adds it to the ready queue.  Returns the thread identifier
    for the new thread, or TID_ERROR if creation fails.
@@ -169,10 +185,9 @@ thread_print_stats (void)
 
    The code provided sets the new thread's `priority' member to
    PRIORITY, but no actual priority scheduling is implemented.
-   Priority scheduling is the goal of Problem 1-3. */
+   Priority scheduling is the goal of Problem 1-3.                            */
 tid_t
-thread_create (const char *name, int priority,
-               thread_func *function, void *aux) 
+thread_create (const char *name, int priority, thread_func *function, void *aux) 
 {
   struct thread *t;
   struct kernel_thread_frame *kf;
@@ -209,12 +224,8 @@ thread_create (const char *name, int priority,
   /* Add to run queue. */
   thread_unblock (t);
   
-  enum intr_level old_level;
-  old_level = intr_disable();
-  if (!list_empty(&ready_list)) { // If ready list is not empty
-		  struct thread *t = list_entry(list_front(&ready_list), struct thread, elem); // Get first thread in ready list
-		  if (thread_current()->priority < t->priority) thread_yield(); // If current thread priority is less than first thread's priority in ready list yield.
-  }
+  enum intr_level old_level = intr_disable();
+  thread_try_yield(); // Try thread yield
   intr_set_level(old_level);
 
   return tid;
@@ -236,14 +247,22 @@ thread_block (void)
   schedule ();
 }
 
-/* Transitions a blocked thread T to the ready-to-run state.
+/* 
+   Modified By: William Van Cleve, Shawn Kirby and Connor McElroy
+   
+   Changes Inspired By: https://github.com/yuan901202/pintos_2
+       https://github.com/ryantimwilson/Pintos-Project-1
+	   https://github.com/microdog/pintos-project-1
+	   https://github.com/nekketsuing/Pintos-Project-1
+	   
+   Transitions a blocked thread T to the ready-to-run state.
    This is an error if T is not blocked.  (Use thread_yield() to
    make the running thread ready.)
 
    This function does not preempt the running thread.  This can
    be important: if the caller had disabled interrupts itself,
    it may expect that it can atomically unblock a thread and
-   update other data. */
+   update other data.          */
 void
 thread_unblock (struct thread *t) 
 {
@@ -313,7 +332,15 @@ thread_exit (void)
   NOT_REACHED ();
 }
 
-/* Yields the CPU.  The current thread is not put to sleep and
+/* 
+   Modified By: William Van Cleve, Shawn Kirby and Connor McElroy
+   
+   Changes Inspired By: https://github.com/yuan901202/pintos_2
+       https://github.com/ryantimwilson/Pintos-Project-1
+	   https://github.com/microdog/pintos-project-1
+	   https://github.com/nekketsuing/Pintos-Project-1
+
+   Yields the CPU.  The current thread is not put to sleep and
    may be scheduled again immediately at the scheduler's whim. */
 void
 thread_yield (void) 
@@ -346,15 +373,69 @@ thread_foreach (thread_action_func *func, void *aux)
       struct thread *t = list_entry (e, struct thread, allelem);
       func (t, aux);
     }
+
 }
 
-/* Sets the current thread's priority to NEW_PRIORITY. */
+/*
+   Added By: William Van Cleve, Shawn Kirby and Connor McElroy
+   
+   Inspired By: https://github.com/yuan901202/pintos_2
+       https://github.com/ryantimwilson/Pintos-Project-1
+	   https://github.com/microdog/pintos-project-1
+	   https://github.com/nekketsuing/Pintos-Project-1
+
+   Function to check whether a thread should yield. */
+void thread_try_yield(void) {
+  enum intr_level old_level = intr_disable();
+  
+  if (!list_empty(&ready_list)) { // If ready list is not empty
+  	struct thread *t = list_entry(list_front(&ready_list), struct thread, elem); // Get first thread in ready list
+	if (thread_current()->priority < t->priority) thread_yield(); // If current thread priority is less than first thread's priority in ready list yield.
+  }
+  
+  intr_set_level(old_level);
+}
+
+/*
+   Added By: William Van Cleve, Shawn Kirby and Connor McElroy
+   
+   Inspired By: https://github.com/yuan901202/pintos_2
+       https://github.com/ryantimwilson/Pintos-Project-1
+	   https://github.com/microdog/pintos-project-1
+	   https://github.com/nekketsuing/Pintos-Project-1
+
+   Function to check whether a priority should be donated. */
+void thread_try_donate_priority(void) {
+	struct thread *t = thread_current(); // Get current thread
+	struct lock *l = t->waiting_lock; // Get waiting lock
+	int depth = 0; // Set starting depth
+	while (l != NULL && depth != 8) {
+		depth++; // Increment depth
+		if (l->holder == NULL) return; // If no holder then break loop
+		if (l->holder->priority < t->priority) {
+			l->holder->priority = t->priority; // Donate priority
+			t = l->holder; // Get next thread
+			l = t->waiting_lock; // Get next waiting lock
+		}
+		else return; // End while
+	}
+}
+
+/* 
+   Modified By: William Van Cleve, Shawn Kirby and Connor McElroy
+   
+   Changes Inspired By: https://github.com/yuan901202/pintos_2
+       https://github.com/ryantimwilson/Pintos-Project-1
+	   https://github.com/microdog/pintos-project-1
+	   https://github.com/nekketsuing/Pintos-Project-1
+
+   Sets the current thread's priority to NEW_PRIORITY. */
 void
 thread_set_priority (int new_priority) 
 {
-  if (new_priority == thread_current()->priority) return;
-  enum intr_level old_level;
-  old_level = intr_disable();
+  if (new_priority == thread_current()->priority) return; // No changes necessary
+  
+  enum intr_level old_level = intr_disable();
   
   struct thread *current = thread_current(); // Get current thread
   int old_priority = current->priority; // Save old priority of current thread
@@ -365,37 +446,25 @@ thread_set_priority (int new_priority)
 	  if (current->priority < highest_priority_donor->priority) current->priority = highest_priority_donor->priority; // If donor needs updated priority update it
   }
   
-  if (new_priority < old_priority) { // If new priority is less than old priority
-	  if (!list_empty(&ready_list)) { // If ready list is not empty
-		  struct thread *t = list_entry(list_front(&ready_list), struct thread, elem); // Get first thread in ready list
-		  if (current->priority < t->priority) thread_yield(); // If current thread priority is less than first thread's priority in ready list yield.
-	  }
-  } 
-  else { // See if the new priority can be donated
-    struct thread *t = current;
-	struct lock *l = t->waiting_lock; // Get waiting lock
-	int depth = 0; // Set starting depth
-	while (l != NULL && depth != 8) {
-		depth++; // Increment depth
-		if (l->holder == NULL) break; // If no holder then break loop
-		if (l->holder->priority < t->priority) {
-			l->holder->priority = t->priority; // Donate priority
-			t = l->holder; // Get next thread
-			l = t->waiting_lock; // Get next waiting lock
-		}
-		else break; // End while
-	}
-  }
+  if (new_priority < old_priority) thread_try_yield(); // See if new priority causes thread to yield
+  else thread_try_donate_priority(); // See if the new priority can be donated
   
   intr_set_level(old_level);
 }
 
-/* Returns the current thread's priority. */
+/* 
+   Modified By: William Van Cleve, Shawn Kirby and Connor McElroy
+   
+   Changes Inspired By: https://github.com/yuan901202/pintos_2
+       https://github.com/ryantimwilson/Pintos-Project-1
+	   https://github.com/microdog/pintos-project-1
+	   https://github.com/nekketsuing/Pintos-Project-1
+
+   Returns the current thread's priority. */
 int
 thread_get_priority (void) 
 {
-  enum intr_level old_level;
-  old_level = intr_disable();
+  enum intr_level old_level = intr_disable();
   int p = thread_current()->priority; // Get thread priority
   intr_set_level(old_level);
   return p; // Return thread priority
@@ -502,8 +571,15 @@ is_thread (struct thread *t)
   return t != NULL && t->magic == THREAD_MAGIC;
 }
 
-/* Does basic initialization of T as a blocked thread named
-   NAME. */
+/* 
+   Modified By: William Van Cleve, Shawn Kirby and Connor McElroy
+   
+   Changes Inspired By: https://github.com/yuan901202/pintos_2
+       https://github.com/ryantimwilson/Pintos-Project-1
+	   https://github.com/microdog/pintos-project-1
+	   https://github.com/nekketsuing/Pintos-Project-1
+
+   Does basic initialization of T as a blocked thread named NAME. */
 static void
 init_thread (struct thread *t, const char *name, int priority)
 {
@@ -522,9 +598,9 @@ init_thread (struct thread *t, const char *name, int priority)
 
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);
-  t->original_priority = priority;
-  t->waiting_lock = NULL;
-  list_init(&t->donations);	
+  t->original_priority = priority; // Initialize original priority
+  t->waiting_lock = NULL; // Initialize waiting lock
+  list_init(&t->donations);	// Initialize donation list
   intr_set_level (old_level);
 }
 
