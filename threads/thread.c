@@ -32,8 +32,9 @@ static struct list ready_list;
        https://github.com/ryantimwilson/Pintos-Project-1
 	   https://github.com/microdog/pintos-project-1
 	   https://github.com/nekketsuing/Pintos-Project-1
+	   https://bitbucket.org/eardic/pintos-project-1/src
    
-   Function to determine the smallest priority between two threads.                                     */
+   Function to determine the smallest priority between two threads.                              */
 bool priority_less_func(const struct list_elem *e1, const struct list_elem *e2, void *aux UNUSED) {
 	struct thread *t1 = list_entry(e1, struct thread, elem); // Thread 1
 	struct thread *t2 = list_entry(e2, struct thread, elem); // Thread 2
@@ -170,6 +171,7 @@ thread_print_stats (void)
        https://github.com/ryantimwilson/Pintos-Project-1
 	   https://github.com/microdog/pintos-project-1
 	   https://github.com/nekketsuing/Pintos-Project-1
+	   https://bitbucket.org/eardic/pintos-project-1/src
 	   
    Creates a new kernel thread named NAME with the given initial
    PRIORITY, which executes FUNCTION passing AUX as the argument,
@@ -332,7 +334,8 @@ thread_yield (void)
   ASSERT (!intr_context ());
 
   old_level = intr_disable ();
-  if (cur != idle_thread) list_push_back (&ready_list, &cur->elem);
+  if (cur != idle_thread)
+	list_push_back (&ready_list, &cur->elem);
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
@@ -363,6 +366,7 @@ thread_foreach (thread_action_func *func, void *aux)
        https://github.com/ryantimwilson/Pintos-Project-1
 	   https://github.com/microdog/pintos-project-1
 	   https://github.com/nekketsuing/Pintos-Project-1
+	   https://bitbucket.org/eardic/pintos-project-1/src
 
    Function to check whether a priority should be donated. */
 void thread_try_donate_priority(void) {
@@ -388,6 +392,7 @@ void thread_try_donate_priority(void) {
        https://github.com/ryantimwilson/Pintos-Project-1
 	   https://github.com/microdog/pintos-project-1
 	   https://github.com/nekketsuing/Pintos-Project-1
+	   https://bitbucket.org/eardic/pintos-project-1/src
 
    Sets the current thread's priority to NEW_PRIORITY. */
 void
@@ -397,7 +402,7 @@ thread_set_priority (int new_priority)
   
   struct thread *current = thread_current(); // Get current thread
   
-  if (!list_empty(&current->donations)) {
+  if (!list_empty(&current->donations)) { // If priority is donated
 	  current->original_priority = new_priority; // Put new priority in original priority
 	  return; // New priority will be applied in lock_release
   }
@@ -406,12 +411,13 @@ thread_set_priority (int new_priority)
   current->priority = new_priority; // Update new priority in priority
   current->original_priority = new_priority; // Put new priority in original priority
 
-  if (new_priority > old_priority) thread_try_donate_priority(); // If new priority is greater than old priority try donating it
-  struct thread *highest_priority_thread = list_entry(list_max(&ready_list, priority_less_func, NULL), struct thread, elem); // Get highest priority thread 
-  intr_set_level(old_level);  
+  if (new_priority > old_priority) thread_try_donate_priority(); // If new priority is greater than old priority try donating it 
+  intr_set_level(old_level);
+  struct thread *highest_priority_thread = list_entry(list_max(&ready_list, priority_less_func, NULL), struct thread, elem); // Get highest priority thread
   if (current->priority < highest_priority_thread->priority) thread_yield(); // If current thread no longer has highest priority yield
 }
 
+/* Returns the current thread's priority. */
 int
 thread_get_priority (void) 
 {
@@ -526,6 +532,7 @@ is_thread (struct thread *t)
        https://github.com/ryantimwilson/Pintos-Project-1
 	   https://github.com/microdog/pintos-project-1
 	   https://github.com/nekketsuing/Pintos-Project-1
+	   https://bitbucket.org/eardic/pintos-project-1/src
 
    Does basic initialization of T as a blocked thread named NAME. */
 static void
@@ -565,7 +572,16 @@ alloc_frame (struct thread *t, size_t size)
   return t->stack;
 }
 
-/* Chooses and returns the next thread to be scheduled.  Should
+/* 
+   Modified By: William Van Cleve, Shawn Kirby and Connor McElroy
+   
+   Changes Inspired By: https://github.com/yuan901202/pintos_2
+       https://github.com/ryantimwilson/Pintos-Project-1
+	   https://github.com/microdog/pintos-project-1
+	   https://github.com/nekketsuing/Pintos-Project-1
+	   https://bitbucket.org/eardic/pintos-project-1/src
+
+   Chooses and returns the next thread to be scheduled.  Should
    return a thread from the run queue, unless the run queue is
    empty.  (If the running thread can continue running, then it
    will be in the run queue.)  If the run queue is empty, return

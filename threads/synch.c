@@ -50,7 +50,16 @@ sema_init (struct semaphore *sema, unsigned value)
   list_init (&sema->waiters);
 }
 
-/* Down or "P" operation on a semaphore.  Waits for SEMA's value
+/* 
+   Modified By: William Van Cleve, Shawn Kirby and Connor McElroy
+   
+   Changes Inspired By: https://github.com/yuan901202/pintos_2
+       https://github.com/ryantimwilson/Pintos-Project-1
+	   https://github.com/microdog/pintos-project-1
+	   https://github.com/nekketsuing/Pintos-Project-1
+	   https://bitbucket.org/eardic/pintos-project-1/src
+
+   Down or "P" operation on a semaphore.  Waits for SEMA's value
    to become positive and then atomically decrements it.
 
    This function may sleep, so it must not be called within an
@@ -68,7 +77,7 @@ sema_down (struct semaphore *sema)
   old_level = intr_disable ();
   while (sema->value == 0) 
     {
-      thread_try_donate_priority();
+      thread_try_donate_priority(); // Try donating priority
       list_push_back(&sema->waiters, &thread_current()->elem);
       thread_block ();
     }
@@ -76,7 +85,16 @@ sema_down (struct semaphore *sema)
   intr_set_level (old_level);
 }
 
-/* Down or "P" operation on a semaphore, but only if the
+/* 
+   Modified By: William Van Cleve, Shawn Kirby and Connor McElroy
+   
+   Changes Inspired By: https://github.com/yuan901202/pintos_2
+       https://github.com/ryantimwilson/Pintos-Project-1
+	   https://github.com/microdog/pintos-project-1
+	   https://github.com/nekketsuing/Pintos-Project-1
+	   https://bitbucket.org/eardic/pintos-project-1/src
+   
+   Down or "P" operation on a semaphore, but only if the
    semaphore is not already 0.  Returns true if the semaphore is
    decremented, false otherwise.
 
@@ -90,12 +108,13 @@ sema_try_down (struct semaphore *sema)
   ASSERT (sema != NULL);
 
   old_level = intr_disable ();
-  if (sema->value > 0) {
-    sema->value--;
-    success = true; 
-  }
+  if (sema->value > 0) 
+    {
+      sema->value--;
+      success = true; 
+    }
   else {
-	  thread_try_donate_priority();
+	  thread_try_donate_priority(); // Try donating priority
 	  success = false;
   }	  
   
@@ -111,6 +130,7 @@ sema_try_down (struct semaphore *sema)
        https://github.com/ryantimwilson/Pintos-Project-1
 	   https://github.com/microdog/pintos-project-1
 	   https://github.com/nekketsuing/Pintos-Project-1
+	   https://bitbucket.org/eardic/pintos-project-1/src
    
    Up or "V" operation on a semaphore.  Increments SEMA's value
    and wakes up one thread of those waiting for SEMA, if any.
@@ -120,21 +140,21 @@ void
 sema_up (struct semaphore *sema) 
 {
   enum intr_level old_level;
-  struct thread *highest_priority_thread = NULL;
+  struct thread *max_thread = NULL; // Initialize highest priority thread
 
   ASSERT (sema != NULL);
 
   old_level = intr_disable ();
   if (!list_empty (&sema->waiters)) {
-	struct list_elem *highest_priority_waiter = list_max(&sema->waiters, priority_less_func, NULL); // Get highest priority waiter
-	list_remove(highest_priority_waiter); // Remove highest priority waiter
-	highest_priority_thread = list_entry(highest_priority_waiter, struct thread, elem); // Get highest priority waiter's thread
-	thread_unblock(highest_priority_thread); // Unblock highest priority thread
+	struct list_elem *max_waiter = list_max(&sema->waiters, priority_less_func, NULL); // Get highest priority waiter
+	list_remove(max_waiter); // Remove highest priority waiter
+	max_thread = list_entry(max_waiter, struct thread, elem); // Get highest priority waiter's thread
+	thread_unblock(max_thread); // Unblock highest priority thread
   }
   
   sema->value++;
   intr_set_level (old_level);
-  if (highest_priority_thread != NULL && thread_current()->priority < highest_priority_thread->priority) thread_yield(); // Yield to highest priority
+  if (max_thread != NULL && thread_current()->priority < max_thread->priority) thread_yield(); // Yield to highest priority
 }
 
 static void sema_test_helper (void *sema_);
@@ -205,6 +225,7 @@ lock_init (struct lock *lock)
        https://github.com/ryantimwilson/Pintos-Project-1
 	   https://github.com/microdog/pintos-project-1
 	   https://github.com/nekketsuing/Pintos-Project-1
+	   https://bitbucket.org/eardic/pintos-project-1/src
 
    Acquires LOCK, sleeping until it becomes available if
    necessary.  The lock must not already be held by the current
@@ -242,6 +263,7 @@ lock_acquire (struct lock *lock)
        https://github.com/ryantimwilson/Pintos-Project-1
 	   https://github.com/microdog/pintos-project-1
 	   https://github.com/nekketsuing/Pintos-Project-1
+	   https://bitbucket.org/eardic/pintos-project-1/src
 
    Tries to acquires LOCK and returns true if successful or false
    on failure.  The lock must not already be held by the current
@@ -277,6 +299,7 @@ lock_try_acquire (struct lock *lock)
        https://github.com/ryantimwilson/Pintos-Project-1
 	   https://github.com/microdog/pintos-project-1
 	   https://github.com/nekketsuing/Pintos-Project-1
+	   https://bitbucket.org/eardic/pintos-project-1/src
 
    Releases LOCK, which must be owned by the current thread.
 
@@ -390,6 +413,7 @@ cond_wait (struct condition *cond, struct lock *lock)
        https://github.com/ryantimwilson/Pintos-Project-1
 	   https://github.com/microdog/pintos-project-1
 	   https://github.com/nekketsuing/Pintos-Project-1
+	   https://bitbucket.org/eardic/pintos-project-1/src
 	   
 	Compares priority of semaphores                                                                       */
 static bool sem_less_priority_func(const struct list_elem *e1, const struct list_elem *e2, void *aux UNUSED)
@@ -410,6 +434,7 @@ static bool sem_less_priority_func(const struct list_elem *e1, const struct list
        https://github.com/ryantimwilson/Pintos-Project-1
 	   https://github.com/microdog/pintos-project-1
 	   https://github.com/nekketsuing/Pintos-Project-1
+	   https://bitbucket.org/eardic/pintos-project-1/src
 
    If any threads are waiting on COND (protected by LOCK), then
    this function signals one of them to wake up from its wait.

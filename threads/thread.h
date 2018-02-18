@@ -149,7 +149,6 @@ int thread_get_load_avg (void);
 
 /* Added for priority scheduling. */
 bool priority_less_func(const struct list_elem *e1, const struct list_elem *e2, void *aux UNUSED);
-void thread_try_yield(void);
 void thread_try_donate_priority(void);
 
 #endif /* threads/thread.h */

@@ -136,7 +136,7 @@ timer_sleep (int64_t ticks)
   current->wake_tick = timer_ticks() + ticks; // Set thread wake tick
   
   list_insert_ordered(&sleep_list, &current->elem, wake_tick_less_func, NULL); // Insert thread in sleep list by wake tick
-  thread_block(); // Block thread
+  thread_block(); // Block thread to put it to sleep
 
   intr_set_level (old_level);
 }
@@ -228,13 +228,13 @@ timer_interrupt (struct intr_frame *args UNUSED)
   ticks++;
   thread_tick();
   
-  struct list_elem *e = list_begin(&sleep_list); // Get first element
+  struct list_elem *e = list_begin(&sleep_list); // Get first element of the sleeping list
   while (e != list_end(&sleep_list)) {
 	struct thread *t = list_entry(e, struct thread, elem); // Get first element's thread
 	if (t->wake_tick > ticks) break; // Reached threads that aren't ready to wake up
 	  
 	list_remove(e); // Remove sleeping thread from sleep list to be woken up
-	thread_unblock(t); // Unblock sleeping thread
+	thread_unblock(t); // Unblock thread to be woken up
 	e = list_begin(&sleep_list); // Get next list element
   }
 }
