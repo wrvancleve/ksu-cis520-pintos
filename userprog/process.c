@@ -497,10 +497,13 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
   ASSERT (pg_ofs (upage) == 0);
   ASSERT (ofs % PGSIZE == 0);
 
+  file_seek(file, ofs); // Seek file to offset
   while (read_bytes > 0 || zero_bytes > 0) 
     {
       size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
+      
+      /*
       struct page *p = page_allocate (upage, !writable);
       if (p == NULL)
         return false;
@@ -510,6 +513,22 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
           p->file_offset = ofs;
           p->file_bytes = page_read_bytes;
         }
+      */
+      
+      uint8_t *page = vm_allocate_frame(PAL_USER); // Allocate frame by the user pool
+      if (page == NULL) return false; // Return failure if error getting a frame
+      
+      if (file_read(file, page, page_read_bytes) != (int) page_read_bytes) {
+        vm_free_frame(page); // Free frame to obtain an unused frame
+        return false; // Return failure
+      }
+      memset(page + page_read_bytes, 0, page_zero_bytes); // FIND OUT
+      
+      if (!install_page(upage, page, writable)) {
+        vm_free_frame(page); // Free frame because of error installing page to the program's address space
+        return false; // Return failure
+      }
+      
       read_bytes -= page_read_bytes;
       zero_bytes -= page_zero_bytes;
       ofs += page_read_bytes;
