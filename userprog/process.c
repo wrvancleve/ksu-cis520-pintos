@@ -105,6 +105,8 @@ start_process (void *exec_)
   sema_up (&exec->load_done);
   if (!success) 
     thread_exit ();
+    
+  palloc_free_page(pg_round_down(exec->file_name)); // TBD
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -296,11 +298,17 @@ static bool validate_segment (const struct Elf32_Phdr *, struct file *);
 static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
                           uint32_t read_bytes, uint32_t zero_bytes,
                           bool writable);
+static bool load_segment_lazily (struct file *file, off_t ofs, uint8_t *upage,
+                          uint32_t read_bytes, uint32_t zero_bytes,
+                          bool writable);
 
-/* Loads an ELF executable from FILE_NAME into the current thread.
-   Stores the executable's entry point into *EIP
-   and its initial stack pointer into *ESP.
-   Returns true if successful, false otherwise. */
+/* 
+   Modified By: William Van Cleve, Connor McElroy, Shawn Kirby
+   Changes Inspired By: 
+   Description: Loads an ELF executable from FILE_NAME into the current thread.
+     Stores the executable's entry point into *EIP
+     and its initial stack pointer into *ESP.
+     Returns true if successful, false otherwise.                               */
 bool
 load (const char *cmd_line, void (**eip) (void), void **esp) 
 {
@@ -404,7 +412,7 @@ load (const char *cmd_line, void (**eip) (void), void **esp)
                   read_bytes = 0;
                   zero_bytes = ROUND_UP (page_offset + phdr.p_memsz, PGSIZE);
                 }
-              if (!load_segment (file, file_page, (void *) mem_page,
+              if (!load_segment_lazily (file, file_page, (void *) mem_page,
                                  read_bytes, zero_bytes, writable))
                 goto done;
             }
@@ -476,6 +484,30 @@ validate_segment (const struct Elf32_Phdr *phdr, struct file *file)
 }
 
 /* Loads a segment starting at offset OFS in FILE at address
+   UPAGE lazily. */
+static bool
+load_segment_lazily(struct file *file, off_t ofs, uint8_t *upage, uint32_t read_bytes, uint32_t zero_bytes, bool writable) {
+  ASSERT ((read_bytes + zero_bytes) % PGSIZE == 0);
+  ASSERT (pg_ofs (upage) == 0);
+  ASSERT (ofs % PGSIZE == 0);
+  
+  while (read_bytes > 0 || zero_bytes > 0) {
+    size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE; // Calculate page read bytes from read_bytes and PGSIZE
+    size_t page_zero_bytes = PGSIZE - page_read_bytes; // Set zero bytes as remaining bytes
+    
+    /* Add a file supplemental page entry tp the supplemental page table */
+    if (!suppl_pt_insert_file(file, ofs, upage, page_read_bytes, page_zero_bytes, writable)) return false; // If error inserting return failure
+    
+    /* Advance */
+    read_bytes -= page_read_bytes;
+    zero_bytes -= page_zero_bytes;
+    ofs += page_read_bytes;
+    upage += PGSIZE;
+  }
+  return true;
+}
+
+/* Loads a segment starting at offset OFS in FILE at address
    UPAGE.  In total, READ_BYTES + ZERO_BYTES bytes of virtual
    memory are initialized, as follows:
 
@@ -515,20 +547,24 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
         }
       */
       
-      uint8_t *page = vm_allocate_frame(PAL_USER); // Allocate frame by the user pool
-      if (page == NULL) return false; // Return failure if error getting a frame
+      /* Get a page from memory */
+      uint8_t *kpage = vm_allocate_frame(PAL_USER); // Allocate frame by the user pool
+      if (kpage == NULL) return false; // Return failure if error getting a frame
       
-      if (file_read(file, page, page_read_bytes) != (int) page_read_bytes) {
-        vm_free_frame(page); // Free frame to obtain an unused frame
+      /* Load the page */
+      if (file_read(file, kpage, page_read_bytes) != (int) page_read_bytes) {
+        vm_free_frame(kpage); // Free frame to obtain an unused frame
         return false; // Return failure
       }
-      memset(page + page_read_bytes, 0, page_zero_bytes); // FIND OUT
+      memset(kpage + page_read_bytes, 0, page_zero_bytes); // Zero out the remaining bytes after page_read_bytes
       
-      if (!install_page(upage, page, writable)) {
-        vm_free_frame(page); // Free frame because of error installing page to the program's address space
+      /* Add page to process' address space */
+      if (!install_page(upage, kpage, writable)) {
+        vm_free_frame(kpage); // Free frame because of error installing page to the program's address space
         return false; // Return failure
       }
       
+      /* Advance */
       read_bytes -= page_read_bytes;
       zero_bytes -= page_zero_bytes;
       ofs += page_read_bytes;
