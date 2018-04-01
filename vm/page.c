@@ -51,8 +51,7 @@ page_for_addr (const void *address)
         return hash_entry (e, struct page, hash_elem);
 
       /* No page.  Expand stack? */
-
-/* add code */
+      
 
     }
   return NULL;
@@ -144,16 +143,18 @@ page_out (struct page *p)
      process to fault.  This must happen before checking the
      dirty bit, to prevent a race with the process dirtying the
      page. */
-
-/* add code here */
+  pagedir_clear_page (thread_current ()->pagedir, p->addr);
 
   /* Has the frame been modified? */
-
-/* add code here */
+  dirty = pagedir_is_dirty(thread_current ()->pagedir, p->addr);
 
   /* Write frame contents to disk if necessary. */
-
-/* add code here */
+  if (dirty) {
+    file_seek (p->file, p->file_offset); // Seek to file
+    file_write (p->file, p->addr, p->file_bytes) == p->file_bytes; // Write to file
+  }
+  
+  // Swap out
 
   return ok;
 }
