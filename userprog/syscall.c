@@ -504,7 +504,19 @@ lookup_mapping (int handle)
 static void
 unmap (struct mapping *m) 
 {
-/* add code here */
+  struct thread *t = thread_current(); // Get current thread
+  size_t count = m->page_cnt; // Set count to page count of mapping
+  size_t offset = 0; // Start offset at 0
+  uint8_t vaddr = m->base; // Start vaddr at mapping base
+  
+  while (count-- > 0) {
+    vaddr += offset; // Increment vaddr by offset
+    page_deallocate (vaddr); // Deallocate & evict page at vaddr (Pages out the page)
+    offset += PGSIZE; // Increment offset by page size
+  }
+  
+  list_remove (&m->elem); // Remove mapping m from mapping list in current thread
+  free (m); // Free mapping m
 }
  
 /* Mmap system call. */
@@ -560,9 +572,12 @@ sys_mmap (int handle, void *addr)
 static int
 sys_munmap (int mapping) 
 {
-/* add code here */
-
-  return 0;
+  struct mapping *m = lookup_mapping(mapping);
+  if (m != NULL) {
+   unmap(m); // Unmap mapping m
+   return mapping; // Return mapping id removed
+  }
+  else return -1; // Return error -1
 }
  
 /* On thread exit, close all open files and unmap all mappings. */

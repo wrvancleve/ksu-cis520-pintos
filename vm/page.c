@@ -138,7 +138,7 @@ page_out (struct page *p)
 
   ASSERT (p->frame != NULL);
   ASSERT (lock_held_by_current_thread (&p->frame->lock));
-
+  
   /* Mark page not present in page table, forcing accesses by the
      process to fault.  This must happen before checking the
      dirty bit, to prevent a race with the process dirtying the
@@ -150,11 +150,14 @@ page_out (struct page *p)
 
   /* Write frame contents to disk if necessary. */
   if (dirty) {
-    file_seek (p->file, p->file_offset); // Seek to file
-    file_write (p->file, p->addr, p->file_bytes) == p->file_bytes; // Write to file
+    if (p->private) {
+      ok = swap_out (p); // Swap out page p
+    }
+    else {
+      file_seek (p->file, p->file_offset); // Seek to file
+      ok = file_write (p->file, p->addr, p->file_bytes) == p->file_bytes; // Write to file
+    }
   }
-  
-  // Swap out
 
   return ok;
 }
