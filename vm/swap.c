@@ -76,9 +76,7 @@ swap_out (struct page *p)
   // Write out page sectors
   for (i = 0; i < PAGE_SECTORS; i++)
     block_write (swap_device, p->sector + i,
-                 p->frame->base + i * BLOCK_SECTOR_SIZE);
-  bitmap_reset (swap_bitmap, p->sector / PAGE_SECTORS);
-  p->sector = (block_sector_t) - 1;  
+                 (uint8_t *) p->frame->base + i * BLOCK_SECTOR_SIZE);
  
   p->private = false;
   p->file = NULL;

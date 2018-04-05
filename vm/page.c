@@ -50,9 +50,9 @@ page_for_addr (const void *address)
       if (e != NULL)
         return hash_entry (e, struct page, hash_elem);
 
-      /* No page.  Expand stack? */
-      
-
+      /* No page.  Expand stack? (If address is for the stack && address is within 32 bytes of stack) */
+      if ((p.addr > PHYS_BASE - STACK_MAX) && ((void *) address > thread_current()->user_esp - 32))
+        return page_allocate (p.addr, false); // Allocate one more page for the stack
     }
   return NULL;
 }
@@ -134,7 +134,7 @@ bool
 page_out (struct page *p) 
 {
   bool dirty;
-  bool ok = false;
+  bool ok = true;
 
   ASSERT (p->frame != NULL);
   ASSERT (lock_held_by_current_thread (&p->frame->lock));
@@ -143,22 +143,21 @@ page_out (struct page *p)
      process to fault.  This must happen before checking the
      dirty bit, to prevent a race with the process dirtying the
      page. */
-  pagedir_clear_page (thread_current ()->pagedir, p->addr);
+  pagedir_clear_page (p->thread->pagedir, (void *) p->addr);
 
   /* Has the frame been modified? */
-  dirty = pagedir_is_dirty(thread_current ()->pagedir, p->addr);
+  dirty = pagedir_is_dirty(p->thread->pagedir, (const void *) p->addr);
 
-  /* Write frame contents to disk if necessary. */
-  if (dirty) {
-    if (p->private) {
-      ok = swap_out (p); // Swap out page p
-    }
-    else {
-      file_seek (p->file, p->file_offset); // Seek to file
-      ok = file_write (p->file, p->addr, p->file_bytes) == p->file_bytes; // Write to file
+  /* Write frame contents to disk if necessary. (Private => Swap | !Private => Disk) */
+  if (p->file == NULL) ok = swap_out (p); // If file is null we need to swap out the frame
+  else {
+    if (dirty) {
+      if (p->private) ok = swap_out (p); // Swap out page p
+      else ok = file_write_at (p->file, (const void *) p->frame->base, p->file_bytes, p->file_offset); // Write to file
     }
   }
-
+  
+  if (ok) p->frame = NULL; // If successful reset frame to null
   return ok;
 }
 

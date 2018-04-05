@@ -503,20 +503,23 @@ lookup_mapping (int handle)
    writing back any pages that have changed. */
 static void
 unmap (struct mapping *m) 
-{
+{  
   struct thread *t = thread_current(); // Get current thread
   size_t count = m->page_cnt; // Set count to page count of mapping
   size_t offset = 0; // Start offset at 0
-  uint8_t vaddr = m->base; // Start vaddr at mapping base
-  
-  while (count-- > 0) {
-    vaddr += offset; // Increment vaddr by offset
-    page_deallocate (vaddr); // Deallocate & evict page at vaddr (Pages out the page)
-    offset += PGSIZE; // Increment offset by page size
-  }
+  uint8_t *vaddr = m->base; // Start vaddr at mapping base
   
   list_remove (&m->elem); // Remove mapping m from mapping list in current thread
-  free (m); // Free mapping m
+  
+  while (count-- > 0) {
+    if (pagedir_is_dirty(t->pagedir, (const void *)(vaddr + offset))) {
+      lock_acquire(&fs_lock); // Acquire lock
+      file_write_at(m->file, (const void *)(vaddr + offset), (PGSIZE * count), offset); // Write file
+      lock_release(&fs_lock); // Release lock
+    }
+    page_deallocate ((void *)(vaddr + offset)); // Deallocate & evict page at vaddr (Pages out the page)
+    offset += PGSIZE; // Increment offset by page size
+  }
 }
  
 /* Mmap system call. */
@@ -573,11 +576,8 @@ static int
 sys_munmap (int mapping) 
 {
   struct mapping *m = lookup_mapping(mapping);
-  if (m != NULL) {
-   unmap(m); // Unmap mapping m
-   return mapping; // Return mapping id removed
-  }
-  else return -1; // Return error -1
+  unmap(m); // Unmap mapping m
+  return 0;  
 }
  
 /* On thread exit, close all open files and unmap all mappings. */
